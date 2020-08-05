@@ -122,7 +122,7 @@ function buildTemporaryFilesImage() {
 	echo
 	echo "-------------Creating temporary files image-------------------"
 	docker build -t support-files-image-for-build \
-		-f "$BUILD_IMAGES_SUPPORT_FILES_DOCKERFILE" \
+		-f "$SUPPORT_FILES_IMAGE_DOCKERFILE" \
 		.
 }
 
@@ -333,10 +333,10 @@ function buildBuildPackImage() {
 }
 
 if [ -z "$imageTypeToBuild" ]; then
-	buildGitHubActionsImage
+	# Build azfunc-jamstack image builds the 'github-actions' image too
 	buildJamStackImage
-	buildLtsVersionsImage
-	buildFullImage
+	
+	# Building VSO image builds both the 'lts-versions' and 'full' build images
 	buildVsoImage
 	buildCliImage
 	buildBuildPackImage

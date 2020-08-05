@@ -56,6 +56,13 @@ fi
 # We don't retrieve this image from a repository but rather build locally to make sure we get
 # the latest version of its own base image.
 
+# Create the following image so that it's contents can be copied to the rest of the images below
+echo
+echo "-------------Creating temporary files image-------------------"
+docker build -t support-files-image \
+    -f "$SUPPORT_FILES_IMAGE_DOCKERFILE" \
+    .
+
 docker build \
     --pull \
     -f "$RUNTIME_BASE_IMAGE_DOCKERFILE_PATH" \

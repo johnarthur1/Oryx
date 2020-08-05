@@ -1,4 +1,4 @@
-FROM githubrunners-buildpackdeps-stretch
+FROM debian:buster-slim
 ARG IMAGES_DIR=/tmp/oryx/images
 ARG BUILD_DIR=/tmp/oryx/build
 RUN mkdir -p ${IMAGES_DIR} \
