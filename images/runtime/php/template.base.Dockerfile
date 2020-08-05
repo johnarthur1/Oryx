@@ -1,33 +1,31 @@
 FROM %PHP_BASE_IMAGE%
 SHELL ["/bin/bash", "-c"]
-ENV PHP_VERSION %PHP_VERSION%
 
-RUN a2enmod rewrite expires include deflate remoteip headers
+ENV PHP_VERSION="%PHP_VERSION%" \
+    APACHE_RUN_USER="www-data" \
+    # Edit the default DocumentRoot setting
+    APACHE_DOCUMENT_ROOT="/home/site/wwwroot" \
+    APACHE_PORT="8080"
 
-ENV APACHE_RUN_USER www-data
-# Edit the default DocumentRoot setting
-ENV APACHE_DOCUMENT_ROOT /home/site/wwwroot
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
-# Edit the default port setting
-ENV APACHE_PORT 8080
-RUN sed -ri -e 's!<VirtualHost \*:80>!<VirtualHost *:${APACHE_PORT}>!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!<VirtualHost _default_:443>!<VirtualHost _default_:${APACHE_PORT}>!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!Listen 80!Listen ${APACHE_PORT}!g' /etc/apache2/ports.conf
-# Edit Configuration to instruct Apache on how to process PHP files
-RUN echo -e '<FilesMatch "\.(?i:ph([[p]?[0-9]*|tm[l]?))$">\n SetHandler application/x-httpd-php\n</FilesMatch>' >> /etc/apache2/apache2.conf
-# Disable Apache2 server signature
-RUN echo -e 'ServerSignature Off' >> /etc/apache2/apache2.conf
-RUN echo -e 'ServerTokens Prod' >> /etc/apache2/apache2.conf
-
-# Install common PHP extensions
-RUN apt-get update \
+RUN a2enmod rewrite expires include deflate remoteip headers \
+    sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
+    sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
+    # Edit the default port setting
+    && sed -ri -e 's!<VirtualHost \*:80>!<VirtualHost *:${APACHE_PORT}>!g' /etc/apache2/sites-available/*.conf \
+    && sed -ri -e 's!<VirtualHost _default_:443>!<VirtualHost _default_:${APACHE_PORT}>!g' /etc/apache2/sites-available/*.conf \
+    && sed -ri -e 's!Listen 80!Listen ${APACHE_PORT}!g' /etc/apache2/ports.conf \
+    # Edit Configuration to instruct Apache on how to process PHP files
+    && echo -e '<FilesMatch "\.(?i:ph([[p]?[0-9]*|tm[l]?))$">\n SetHandler application/x-httpd-php\n</FilesMatch>' >> /etc/apache2/apache2.conf \
+    # Disable Apache2 server signature
+    && echo -e 'ServerSignature Off' >> /etc/apache2/apache2.conf \
+    && echo -e 'ServerTokens Prod' >> /etc/apache2/apache2.conf \
+    # Install common PHP extensions
+    && apt-get update \
     && apt-get upgrade -y \
     && ln -s /usr/lib/x86_64-linux-gnu/libldap.so /usr/lib/libldap.so \
     && ln -s /usr/lib/x86_64-linux-gnu/liblber.so /usr/lib/liblber.so \
-    && ln -s /usr/include/x86_64-linux-gnu/gmp.h /usr/include/gmp.h
-
-RUN set -eux; \
+    && ln -s /usr/include/x86_64-linux-gnu/gmp.h /usr/include/gmp.h \
+    && set -eux; \
     if [[ $PHP_VERSION == 7.4.* ]]; then \
 		apt-get update \
         && apt-get upgrade -y \
@@ -37,9 +35,8 @@ RUN set -eux; \
     else \
 		docker-php-ext-configure gd --with-png-dir=/usr --with-jpeg-dir=/usr \
         && docker-php-ext-configure imap --with-kerberos --with-imap-ssl ; \
-    fi
-
-RUN docker-php-ext-configure pdo_odbc --with-pdo-odbc=unixODBC,/usr \
+    fi \
+    && docker-php-ext-configure pdo_odbc --with-pdo-odbc=unixODBC,/usr \
     && docker-php-ext-install gd \
         mysqli \
         opcache \
@@ -66,48 +63,41 @@ RUN docker-php-ext-configure pdo_odbc --with-pdo-odbc=unixODBC,/usr \
         sysvsem \
         sysvshm \
         pdo_odbc \
-# deprecated from 7.4, so should be avoided in general template for all php versions
-#       wddx \
+        # deprecated from 7.4, so should be avoided in general template for all php versions
+        # wddx \
         xmlrpc \
         xsl \
     && pecl install imagick && docker-php-ext-enable imagick \
-    && pecl install mongodb && docker-php-ext-enable mongodb
-
-# Install the Microsoft SQL Server PDO driver on supported versions only.
-#  - https://docs.microsoft.com/en-us/sql/connect/php/installation-tutorial-linux-mac
-#  - https://docs.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server
-RUN set -eux; \
+    && pecl install mongodb && docker-php-ext-enable mongodb \
+    # Install the Microsoft SQL Server PDO driver on supported versions only.
+    #  - https://docs.microsoft.com/en-us/sql/connect/php/installation-tutorial-linux-mac
+    #  - https://docs.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server
     if [[ $PHP_VERSION == 7.1.* || $PHP_VERSION == 7.2.* || $PHP_VERSION == 7.3.* || $PHP_VERSION == 7.4.* ]]; then \
         pecl install sqlsrv pdo_sqlsrv \
         && echo extension=pdo_sqlsrv.so >> `php --ini | grep "Scan for additional .ini files" | sed -e "s|.*:\s*||"`/30-pdo_sqlsrv.ini \
         && echo extension=sqlsrv.so >> `php --ini | grep "Scan for additional .ini files" | sed -e "s|.*:\s*||"`/20-sqlsrv.ini; \
-    fi
-
-RUN { \
+    fi \
+    && { \
                 echo 'opcache.memory_consumption=128'; \
                 echo 'opcache.interned_strings_buffer=8'; \
                 echo 'opcache.max_accelerated_files=4000'; \
                 echo 'opcache.revalidate_freq=60'; \
                 echo 'opcache.fast_shutdown=1'; \
                 echo 'opcache.enable_cli=1'; \
-    } > /usr/local/etc/php/conf.d/opcache-recommended.ini
-
-RUN { \
+    } > /usr/local/etc/php/conf.d/opcache-recommended.ini \
+    && { \
                 echo 'error_log=/var/log/apache2/php-error.log'; \
                 echo 'display_errors=Off'; \
                 echo 'log_errors=On'; \
                 echo 'display_startup_errors=Off'; \
                 echo 'date.timezone=UTC'; \
                 echo 'zend_extension=opcache'; \
-    } > /usr/local/etc/php/conf.d/php.ini
-
-RUN set -x \
+    } > /usr/local/etc/php/conf.d/php.ini \
     && docker-php-source extract \
     && cd /usr/src/php/ext/odbc \
     && phpize \
     && sed -ri 's@^ *test +"\$PHP_.*" *= *"no" *&& *PHP_.*=yes *$@#&@g' configure \
     && chmod +x ./configure \
     && ./configure --with-unixODBC=shared,/usr \
-    && docker-php-ext-install odbc
-
-RUN rm -rf /tmp/oryx
+    && docker-php-ext-install odbc \
+    && rm -rf /tmp/oryx
