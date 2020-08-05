@@ -1,15 +1,6 @@
 ARG DEBIAN_FLAVOR
 FROM oryx-run-base-${DEBIAN_FLAVOR}
 
-# prevent Debian's PHP packages from being installed
-# https://github.com/docker-library/php/pull/542
-RUN set -eux; \
-	{ \
-		echo 'Package: php*'; \
-		echo 'Pin: release *'; \
-		echo 'Pin-Priority: -1'; \
-	} > /etc/apt/preferences.d/no-debian-php
-
 # dependencies required for running "phpize"
 # (see persistent deps below)
 ENV PHPIZE_DEPS \
@@ -23,8 +14,15 @@ ENV PHPIZE_DEPS \
 		pkg-config \
 		re2c
 
-# persistent / runtime deps
+# prevent Debian's PHP packages from being installed
+# https://github.com/docker-library/php/pull/542
 RUN set -eux; \
+	{ \
+		echo 'Package: php*'; \
+		echo 'Pin: release *'; \
+		echo 'Pin-Priority: -1'; \
+	} > /etc/apt/preferences.d/no-debian-php \
+	# persistent / runtime deps
 	apt-get update; \
 	apt-get upgrade -y \
 	&& apt-get install -y --no-install-recommends \
